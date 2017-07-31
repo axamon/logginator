@@ -1,3 +1,5 @@
+//logginator
+
 package main
 
 import (
@@ -13,6 +15,7 @@ import (
 
 func main() {
 
+	//Create waitgroup to manage go routines
 	var wg sync.WaitGroup
 	wg.Add(1)
 	var totbytes int
@@ -25,7 +28,7 @@ func main() {
 	//strchan := make(chan string)
 
 	if len(os.Args) != 3 {
-		fmt.Println("Verdica i parametri")
+		fmt.Println("Verifica i parametri")
 		os.Exit(1)
 	}
 	dir := os.Args[1] //ad esempio  c:\Projects\Go\src\leggifilezippati

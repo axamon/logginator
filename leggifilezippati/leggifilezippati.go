@@ -1,4 +1,4 @@
-//Trova file zippati in gzip e li legge
+//Package leggfilezippati
 package leggifilezippati
 
 import (
