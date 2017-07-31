@@ -1,4 +1,4 @@
-//logginator
+//logginator dev
 
 package main
 
@@ -39,6 +39,7 @@ func main() {
 	//trasforma lo status http da stringa a intero
 	status, _ := strconv.Atoi(os.Args[2])
 
+	//abilita un watcher sulla directory indicata dir e scrive ogni nuovo nome file in fileschan
 	go leggifilezippati.Contafileindir(dir, fileschan)
 	go leggifilezippati.Leggizip(fileschan, ' ', filezipchan) //passa il channel il nome file e il delimitatore di campo
 	go leggifilezippati.Leggizip(fileschan, ' ', filezipchan)
