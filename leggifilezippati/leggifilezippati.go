@@ -1,4 +1,4 @@
-//Package leggfilezippati
+//Package leggifilezippati permette di leggere file in formago gzip
 package leggifilezippati
 
 import (
@@ -14,7 +14,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-//Contafilein dir prende i nuovi file e li mette in un canale
+//Contafileindir prende i nuovi file e li mette in un canale
 func Contafileindir(dir string, fileschan chan string) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -47,6 +47,7 @@ func Contafileindir(dir string, fileschan chan string) {
 	close(fileschan)
 }
 
+//ReadLine legge un record e lo passa su un altro canale
 func ReadLine(fileschan chan string, strchan chan string) {
 
 	for filezippato := range fileschan {
@@ -75,6 +76,7 @@ func ReadLine(fileschan chan string, strchan chan string) {
 	close(strchan)
 }
 
+//Leggizip2 è in test
 func Leggizip2(fileschan chan string, delimiter rune, filezipchan chan []string) {
 
 	for {
