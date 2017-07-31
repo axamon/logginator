@@ -17,21 +17,26 @@ func main() {
 
 	//Create waitgroup to manage go routines
 	var wg sync.WaitGroup
+
+	//Adds one to the wg counter
 	wg.Add(1)
+
 	var totbytes int
 	var numfile int
 
-	servizi := make(map[string]int)
+	servizi := make(map[string]int) //mappa dei servizi e della banda servita
 
 	fileschan := make(chan string)     //canale con i file presenti in dir
 	filezipchan := make(chan []string) //canale con le righe del file decompresse
 	//strchan := make(chan string)
 
-	if len(os.Args) != 3 {
+	if len(os.Args) != 3 { //se i parametri passati non sono 2 allora esce con errore
 		fmt.Println("Verifica i parametri")
 		os.Exit(1)
 	}
 	dir := os.Args[1] //ad esempio  c:\Projects\Go\src\leggifilezippati
+
+	//trasforma lo status http da stringa a intero
 	status, _ := strconv.Atoi(os.Args[2])
 
 	go leggifilezippati.Contafileindir(dir, fileschan)
