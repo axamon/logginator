@@ -4,25 +4,50 @@ package leggifilezippati
 import (
 	"bufio"
 	"compress/gzip"
+	"crypto/md5"
 	"encoding/csv"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/fsnotify/fsnotify"
 )
 
+//Md5Sum restitus the md5sum of a file in hexadecimal
+func Md5Sum(filename string) (result string) {
+	f, err := os.Open(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		log.Fatal(err)
+	}
+
+	result = hex.EncodeToString(h.Sum(nil))
+	return result
+}
+
+//salvaree lista file su disco con percorso assoluto + md5sum
+
+type filetrovati struct {
+	nomefile map[string]bool
+	mux      sync.RWMutex
+}
+
 //Contafileindir prende i nuovi file e li mette in un canale
-func Contafileindir(dir string, fileschan chan string) {
+func (f *filetrovati) Contafileindir(dir string) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer watcher.Close()
-
-	done := make(chan bool)
 	go func() {
 		for {
 			select {
@@ -30,7 +55,9 @@ func Contafileindir(dir string, fileschan chan string) {
 				//log.Println("event:", event)
 				if event.Op&fsnotify.Create == fsnotify.Create {
 					if strings.Contains(event.Name, "gz") {
-						fileschan <- event.Name
+						f.mux.Lock()
+						f.nomefile[event.Name] = true
+						f.mux.Unlock()
 					}
 				}
 			case err := <-watcher.Errors:
@@ -43,8 +70,6 @@ func Contafileindir(dir string, fileschan chan string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	<-done
-	close(fileschan)
 }
 
 //ReadLine legge un record e lo passa su un altro canale
