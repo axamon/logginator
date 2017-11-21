@@ -4,25 +4,86 @@ package leggifilezippati
 import (
 	"bufio"
 	"compress/gzip"
+	"crypto/md5"
 	"encoding/csv"
+	"encoding/gob"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/fsnotify/fsnotify"
 )
 
+const (
+	gobfile string = "mappafile.db"
+)
+
+//Md5Sum restitus the md5sum of a file in hexadecimal
+func Md5Sum(filename string) (result string) {
+	f, err := os.Open(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		log.Fatal(err)
+	}
+	result = hex.EncodeToString(h.Sum(nil))
+	return result
+}
+
+//salva su disco una mappa
+func savemapgob(data map[string]string, m *sync.RWMutex) {
+	m.Lock()
+	dataFile, err := os.Create(gobfile)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	dataEncoder := gob.NewEncoder(dataFile)
+	dataEncoder.Encode(data)
+	m.Unlock()
+	dataFile.Close()
+}
+
+//legge da disco una mappa
+func readmapfromgob(gobfile string) (res map[string]string) {
+	var data map[string]string
+	dataFile, err := os.Open(gobfile)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	dataDecoder := gob.NewDecoder(dataFile)
+	err = dataDecoder.Decode(&data)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	dataFile.Close()
+	return data
+}
+
+//salvaree lista file su disco con percorso assoluto + md5sum
+
+type filetrovati struct {
+	nomefile map[string]bool
+	mux      sync.RWMutex
+}
+
 //Contafileindir prende i nuovi file e li mette in un canale
-func Contafileindir(dir string, fileschan chan string) {
+func (f *filetrovati) Contafileindir(dir string) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer watcher.Close()
-
-	done := make(chan bool)
 	go func() {
 		for {
 			select {
@@ -30,7 +91,10 @@ func Contafileindir(dir string, fileschan chan string) {
 				//log.Println("event:", event)
 				if event.Op&fsnotify.Create == fsnotify.Create {
 					if strings.Contains(event.Name, "gz") {
-						fileschan <- event.Name
+						md5sum := Md5Sum(event.Name)
+						f.mux.Lock()
+						f.nomefile[md5sum] = true
+						f.mux.Unlock()
 					}
 				}
 			case err := <-watcher.Errors:
@@ -43,8 +107,6 @@ func Contafileindir(dir string, fileschan chan string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	<-done
-	close(fileschan)
 }
 
 //ReadLine legge un record e lo passa su un altro canale
@@ -120,20 +182,17 @@ func Leggizip2(fileschan chan string, delimiter rune, filezipchan chan []string)
 }
 
 //Leggizip legge un file zippato
-func Leggizip(fileschan chan string, delimiter rune, filezipchan chan []string) {
+func Leggizip(fileschan chan string, delimiter rune) (filezipchan chan []string) {
 
-	//ricece il nome file dal canale filescan e itera
+	//riceve il nome file dal canale filescan e itera
 	for filezippato := range fileschan {
 		f, err := os.Open(filezippato)
 		if err != nil {
-			//fmt.Println(err)
-			//fmt.Println("SpeedyGonzales")
-			//se il file non può essere letto lo inserisce nuovamente nel canale
-			fileschan <- filezippato
-			continue
+			fmt.Println(err)
 		}
 		defer f.Close()
 
+		fmt.Println(f)
 		//apre il file zippano
 		gr, err := gzip.NewReader(f)
 		if err != nil {
@@ -166,5 +225,6 @@ func Leggizip(fileschan chan string, delimiter rune, filezipchan chan []string) 
 	}
 	//chiude il canale
 	close(filezipchan)
+	return
 
 }
