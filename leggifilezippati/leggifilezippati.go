@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"crypto/md5"
 	"encoding/csv"
+	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -15,6 +16,10 @@ import (
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
+)
+
+const (
+	gobfile string = "mappafile.db"
 )
 
 //Md5Sum restitus the md5sum of a file in hexadecimal
@@ -29,9 +34,40 @@ func Md5Sum(filename string) (result string) {
 	if _, err := io.Copy(h, f); err != nil {
 		log.Fatal(err)
 	}
-
 	result = hex.EncodeToString(h.Sum(nil))
 	return result
+}
+
+//salva su disco una mappa
+func savemapgob(data map[string]string, m *sync.RWMutex) {
+	m.Lock()
+	dataFile, err := os.Create(gobfile)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	dataEncoder := gob.NewEncoder(dataFile)
+	dataEncoder.Encode(data)
+	m.Unlock()
+	dataFile.Close()
+}
+
+//legge da disco una mappa
+func readmapfromgob(gobfile string) (res map[string]string) {
+	var data map[string]string
+	dataFile, err := os.Open(gobfile)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	dataDecoder := gob.NewDecoder(dataFile)
+	err = dataDecoder.Decode(&data)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	dataFile.Close()
+	return data
 }
 
 //salvaree lista file su disco con percorso assoluto + md5sum
@@ -55,8 +91,9 @@ func (f *filetrovati) Contafileindir(dir string) {
 				//log.Println("event:", event)
 				if event.Op&fsnotify.Create == fsnotify.Create {
 					if strings.Contains(event.Name, "gz") {
+						md5sum := Md5Sum(event.Name)
 						f.mux.Lock()
-						f.nomefile[event.Name] = true
+						f.nomefile[md5sum] = true
 						f.mux.Unlock()
 					}
 				}
@@ -145,20 +182,17 @@ func Leggizip2(fileschan chan string, delimiter rune, filezipchan chan []string)
 }
 
 //Leggizip legge un file zippato
-func Leggizip(fileschan chan string, delimiter rune, filezipchan chan []string) {
+func Leggizip(fileschan chan string, delimiter rune) (filezipchan chan []string) {
 
-	//ricece il nome file dal canale filescan e itera
+	//riceve il nome file dal canale filescan e itera
 	for filezippato := range fileschan {
 		f, err := os.Open(filezippato)
 		if err != nil {
-			//fmt.Println(err)
-			//fmt.Println("SpeedyGonzales")
-			//se il file non può essere letto lo inserisce nuovamente nel canale
-			fileschan <- filezippato
-			continue
+			fmt.Println(err)
 		}
 		defer f.Close()
 
+		fmt.Println(f)
 		//apre il file zippano
 		gr, err := gzip.NewReader(f)
 		if err != nil {
@@ -191,5 +225,6 @@ func Leggizip(fileschan chan string, delimiter rune, filezipchan chan []string) 
 	}
 	//chiude il canale
 	close(filezipchan)
+	return
 
 }
